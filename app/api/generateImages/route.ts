@@ -42,7 +42,17 @@ export async function POST(req: Request) {
   const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=${width}&height=${height}&seed=${seed}&nologo=true&model=flux`;
 
   try {
-    const imageResponse = await fetch(imageUrl);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 55000);
+
+    const imageResponse = await fetch(imageUrl, {
+      signal: controller.signal,
+      headers: {
+        "User-Agent": "PixelMindAI/1.0",
+      },
+    });
+    clearTimeout(timeoutId);
+
     if (!imageResponse.ok) {
       throw new Error(`Pollinations error: ${imageResponse.status}`);
     }
@@ -55,6 +65,12 @@ export async function POST(req: Request) {
 
     return Response.json({ b64_json });
   } catch (e: any) {
+    if (e.name === "AbortError") {
+      return Response.json(
+        { error: "Request timed out. Pollinations.ai took too long. Please try again." },
+        { status: 504 }
+      );
+    }
     return Response.json(
       { error: e.toString() },
       { status: 500 },
@@ -62,7 +78,7 @@ export async function POST(req: Request) {
   }
 }
 
-export const runtime = "edge";
+export const maxDuration = 60;
 
 async function getIPAddress() {
   const FALLBACK_IP_ADDRESS = "0.0.0.0";
