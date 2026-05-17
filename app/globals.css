@@ -112,6 +112,33 @@
   }
 }
 
+/* Fix: ensure text and placeholders are visible on dark backgrounds */
+input,
+textarea,
+select {
+  color: var(--text-primary);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-secondary);
+  opacity: 1;
+}
+
+/* Make common Tailwind gray-400 readable on dark backgrounds */
+.text-gray-400 {
+  color: var(--text-secondary) !important;
+}
+
+/* Stronger placeholder override to beat Tailwind utility rules */
+.placeholder\:text-gray-400::placeholder,
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-secondary) !important;
+  opacity: 1 !important;
+}
+
+
 /* Scrollbar Styling */
 ::-webkit-scrollbar {
   width: 6px;

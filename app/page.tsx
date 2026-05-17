@@ -3,6 +3,7 @@
 
 import { Textarea } from "@/components/ui/textarea";
 import { stylePresets, randomPrompts, dimensionsMap } from "@/lib/config";
+import { applyTextOverlay } from "@/lib/canvasTextOverlay";
 import imagePlaceholder from "@/public/image-placeholder.png";
 import ParallaxBackground from "@/components/ParallaxBackground";
 import ParallaxHero from "@/components/ParallaxHero";
@@ -129,12 +130,22 @@ function HomeContent() {
   );
   const [tipIndex, setTipIndex] = useState(0);
 
-  // New states for Text on Image
-  const [showTextOnImage, setShowTextOnImage] = useState(false);
-  const [imageText, setImageText] = useState("");
-  const [fontStyle, setFontStyle] = useState("Bold");
-  const [textPosition, setTextPosition] = useState("Center");
-  const [textColor, setTextColor] = useState("White");
+  // Text Overlay States
+  const [overlayText, setOverlayText] = useState("");
+  const [overlayPosition, setOverlayPosition] = useState<"top" | "center" | "bottom">("bottom");
+  const [overlayFontSize, setOverlayFontSize] = useState(50);
+  const [overlayFontFamily, setOverlayFontFamily] = useState("Arial");
+  const [overlayFontWeight, setOverlayFontWeight] = useState<"normal" | "bold">("bold");
+  const [overlayTextColor, setOverlayTextColor] = useState("#ffffff");
+  const [overlayStrokeColor, setOverlayStrokeColor] = useState("#000000");
+  const [overlayStrokeWidth, setOverlayStrokeWidth] = useState(3);
+  const [overlayBgColor, setOverlayBgColor] = useState("#000000");
+  const [overlayBgOpacity, setOverlayBgOpacity] = useState(0);
+  const [overlayTextStyle, setOverlayTextStyle] = useState<"normal" | "neon" | "shadow" | "outline" | "gradient">("shadow");
+  const [overlayTextAlign, setOverlayTextAlign] = useState<"left" | "center" | "right">("center");
+  const [processedImage, setProcessedImage] = useState<string | null>(null);
+  const [isApplyingText, setIsApplyingText] = useState(false);
+  const [textOverlayOpen, setTextOverlayOpen] = useState(false);
 
   // New states for Enhancer and Random
   const [isEnhancing, setIsEnhancing] = useState(false);
@@ -170,6 +181,7 @@ function HomeContent() {
   );
 
   const isPromptTooShort = prompt.trim().length < MIN_PROMPT_LENGTH;
+  const displayImage = processedImage || (activeGeneration ? `data:image/png;base64,${activeGeneration.image.b64_json}` : null);
 
   const handleRandomPrompt = () => {
     setIsShuffling(true);
@@ -246,11 +258,6 @@ function HomeContent() {
       return;
     }
 
-    // Apply Text on Image
-    if (imageText) {
-      resolvedPrompt += `. The image must contain the exact text "${imageText}" written in ${fontStyle} style, positioned at the ${textPosition} of the image, in ${textColor} color. Make the text clearly readable and prominent.`;
-    }
-
     // Apply Style
     const selectedStyle = stylePresets.find(s => s.id === selectedStyleValue);
     if (selectedStyle && selectedStyle.id !== "none") {
@@ -271,6 +278,7 @@ function HomeContent() {
 
       setRecentGenerations((previous) => [generationItem, ...previous].slice(0, 4));
       setActiveGenerationId(generationItem.id);
+      setProcessedImage(null);
       toast.success("✦ Image generated!");
       setToastMsg("✦ Image generated successfully!");
       setTimeout(() => setToastMsg(null), 3000);
@@ -295,14 +303,46 @@ function HomeContent() {
   }
 
   function handleDownload() {
-    if (!activeGeneration) return;
+    const imageToDownload = processedImage || (activeGeneration ? `data:image/png;base64,${activeGeneration.image.b64_json}` : null);
+    if (!imageToDownload) return;
     const link = document.createElement("a");
-    link.href = `data:image/png;base64,${activeGeneration.image.b64_json}`;
-    link.download = `pixelmind-ai-${activeGeneration.prompt.replace(/\s+/g, "-").toLowerCase()}.png`;
+    link.href = imageToDownload;
+    link.download = `pixelmind-ai-${Date.now()}.png`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   }
+
+  const handleApplyTextOverlay = async () => {
+    if (!activeGeneration || !overlayText.trim()) return;
+    setIsApplyingText(true);
+    try {
+      const result = await applyTextOverlay(activeGeneration.image.b64_json, {
+        text: overlayText,
+        position: overlayPosition,
+        fontSize: overlayFontSize,
+        fontFamily: overlayFontFamily,
+        fontWeight: overlayFontWeight,
+        textColor: overlayTextColor,
+        strokeColor: overlayStrokeColor,
+        strokeWidth: overlayStrokeWidth,
+        backgroundColor: overlayBgColor,
+        backgroundOpacity: overlayBgOpacity,
+        padding: 40,
+        letterSpacing: 2,
+        textAlign: overlayTextAlign,
+        textStyle: overlayTextStyle,
+      });
+      setProcessedImage(result);
+    } catch (error) {
+      console.error("Text overlay failed:", error);
+    }
+    setIsApplyingText(false);
+  };
+
+  const handleRemoveText = () => {
+    setProcessedImage(null);
+  };
 
   return (
     <main style={{
@@ -469,77 +509,310 @@ function HomeContent() {
                 {prompt.length} / 500
               </p>
 
-              {/* Feature 1: Text on Image */}
-              <div style={{ marginTop: "16px" }} className="rounded-xl border border-[#a855f7]/30 bg-black/40 overflow-hidden transition-all duration-300">
+              {/* Add Text to Image Section */}
+              <div style={{ marginBottom: "20px" }}>
                 <button
-                  type="button"
-                  onClick={() => setShowTextOnImage(!showTextOnImage)}
-                  className="flex w-full items-center justify-between p-3 text-sm font-semibold text-gray-200 hover:bg-white/5 transition-colors"
+                  onClick={() => setTextOverlayOpen(!textOverlayOpen)}
+                  style={{
+                    width: "100%",
+                    background: textOverlayOpen
+                      ? "rgba(168,85,247,0.08)"
+                      : "rgba(255,255,255,0.03)",
+                    border: textOverlayOpen
+                      ? "1px solid rgba(168,85,247,0.3)"
+                      : "1px solid rgba(255,255,255,0.08)",
+                    borderRadius: "14px",
+                    padding: "14px 18px",
+                    color: textOverlayOpen ? "#a855f7" : "#94a3b8",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    fontFamily: "'Space Grotesk', sans-serif",
+                    fontSize: "0.95rem",
+                    fontWeight: 500,
+                    transition: "all 0.3s ease",
+                  }}
                 >
-                  <span className="flex items-center gap-2">
-                    <Type className="size-4 text-[#a855f7]" />
-                    ✦ Add Text to Image
+                  <span style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                    <span>✍️</span>
+                    Add Text to Image
                   </span>
-                  {showTextOnImage ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+                  <span style={{
+                    transform: textOverlayOpen ? "rotate(180deg)" : "rotate(0deg)",
+                    transition: "transform 0.3s ease",
+                    fontSize: "0.8rem",
+                  }}>▼</span>
                 </button>
-                <div 
-                  className={`grid transition-all duration-300 ease-in-out ${showTextOnImage ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}
-                >
-                  <div className="overflow-hidden">
-                    <div className="p-4 pt-0 space-y-4">
+
+                {textOverlayOpen && (
+                  <div style={{
+                    marginTop: "12px",
+                    background: "rgba(255,255,255,0.02)",
+                    border: "1px solid rgba(255,255,255,0.06)",
+                    borderRadius: "16px",
+                    padding: "20px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "16px",
+                  }}>
+                    <div>
+                      <label style={{ color: "#94a3b8", fontSize: "0.78rem", fontFamily: "'Space Grotesk', sans-serif", display: "block", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                        Text to display on image
+                      </label>
                       <input
                         type="text"
-                        value={imageText}
-                        onChange={(e) => setImageText(e.target.value)}
-                        placeholder="Type text to appear in the image e.g. 'Hello World'"
-                        className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-[#a855f7]"
+                        value={overlayText}
+                        onChange={(e) => setOverlayText(e.target.value)}
+                        placeholder="e.g. Hello World, What a Day..."
+                        maxLength={100}
+                        style={{
+                          width: "100%",
+                          background: "rgba(255,255,255,0.05)",
+                          border: "1px solid rgba(255,255,255,0.1)",
+                          borderRadius: "10px",
+                          padding: "12px 14px",
+                          color: "#ffffff",
+                          fontSize: "0.95rem",
+                          fontFamily: "'Space Grotesk', sans-serif",
+                          outline: "none",
+                          boxSizing: "border-box",
+                        }}
                       />
-                      <div className="flex flex-wrap gap-4 text-sm">
-                        <div className="flex-1 min-w-[120px]">
-                          <label className="mb-1 block text-xs text-gray-400">Font Style</label>
-                          <select 
-                            value={fontStyle} 
-                            onChange={(e) => setFontStyle(e.target.value)}
-                            className="w-full rounded-lg border border-white/10 bg-[#1a1a2e] px-2 py-1.5 text-white focus:outline-none focus:ring-1 focus:ring-[#a855f7]"
+                    </div>
+
+                    <div>
+                      <label style={{ color: "#94a3b8", fontSize: "0.78rem", fontFamily: "'Space Grotesk', sans-serif", display: "block", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                        Text Style
+                      </label>
+                      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                        {[
+                          { id: "normal", label: "Normal", emoji: "Aa" },
+                          { id: "shadow", label: "Shadow", emoji: "🌑" },
+                          { id: "outline", label: "Outline", emoji: "⭕" },
+                          { id: "neon", label: "Neon", emoji: "💡" },
+                          { id: "gradient", label: "Gradient", emoji: "🌈" },
+                        ].map((style) => (
+                          <button
+                            key={style.id}
+                            onClick={() => setOverlayTextStyle(style.id as any)}
+                            style={{
+                              padding: "8px 14px",
+                              borderRadius: "10px",
+                              border: overlayTextStyle === style.id
+                                ? "1px solid #a855f7"
+                                : "1px solid rgba(255,255,255,0.08)",
+                              background: overlayTextStyle === style.id
+                                ? "rgba(168,85,247,0.15)"
+                                : "rgba(255,255,255,0.04)",
+                              color: overlayTextStyle === style.id ? "#a855f7" : "#94a3b8",
+                              cursor: "pointer",
+                              fontSize: "0.82rem",
+                              fontFamily: "'Space Grotesk', sans-serif",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "6px",
+                              transition: "all 0.2s ease",
+                            }}
                           >
-                            <option>Bold</option>
-                            <option>Elegant Script</option>
-                            <option>Neon Glowing</option>
-                            <option>Graffiti</option>
-                            <option>Vintage</option>
-                          </select>
-                        </div>
-                        <div className="flex-1 min-w-[120px]">
-                          <label className="mb-1 block text-xs text-gray-400">Position</label>
-                          <select 
-                            value={textPosition} 
-                            onChange={(e) => setTextPosition(e.target.value)}
-                            className="w-full rounded-lg border border-white/10 bg-[#1a1a2e] px-2 py-1.5 text-white focus:outline-none focus:ring-1 focus:ring-[#a855f7]"
-                          >
-                            <option>Top</option>
-                            <option>Center</option>
-                            <option>Bottom</option>
-                          </select>
-                        </div>
-                        <div className="flex-1 min-w-[150px]">
-                          <label className="mb-1 block text-xs text-gray-400">Color</label>
-                          <div className="flex gap-2">
-                            {['White', 'Black', 'Gold', 'Red', 'Blue'].map((color) => (
-                              <button
-                                key={color}
-                                type="button"
-                                onClick={(e) => { e.preventDefault(); setTextColor(color); }}
-                                className={`size-6 rounded-full border-2 transition-all ${textColor === color ? 'border-[#a855f7] scale-110' : 'border-transparent'}`}
-                                style={{ backgroundColor: color.toLowerCase(), ...(color === 'Black' ? { border: '1px solid #333' } : {}) }}
-                                title={color}
-                              />
-                            ))}
-                          </div>
-                        </div>
+                            <span>{style.emoji}</span>
+                            {style.label}
+                          </button>
+                        ))}
                       </div>
                     </div>
+
+                    <div>
+                      <label style={{ color: "#94a3b8", fontSize: "0.78rem", fontFamily: "'Space Grotesk', sans-serif", display: "block", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                        Text Position
+                      </label>
+                      <div style={{ display: "flex", gap: "8px" }}>
+                        {[
+                          { id: "top", label: "Top", emoji: "⬆️" },
+                          { id: "center", label: "Center", emoji: "↔️" },
+                          { id: "bottom", label: "Bottom", emoji: "⬇️" },
+                        ].map((pos) => (
+                          <button
+                            key={pos.id}
+                            onClick={() => setOverlayPosition(pos.id as any)}
+                            style={{
+                              flex: 1,
+                              padding: "10px",
+                              borderRadius: "10px",
+                              border: overlayPosition === pos.id
+                                ? "1px solid #a855f7"
+                                : "1px solid rgba(255,255,255,0.08)",
+                              background: overlayPosition === pos.id
+                                ? "rgba(168,85,247,0.15)"
+                                : "rgba(255,255,255,0.04)",
+                              color: overlayPosition === pos.id ? "#a855f7" : "#94a3b8",
+                              cursor: "pointer",
+                              fontSize: "0.85rem",
+                              fontFamily: "'Space Grotesk', sans-serif",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              gap: "6px",
+                              transition: "all 0.2s ease",
+                            }}
+                          >
+                            {pos.emoji} {pos.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                      <div>
+                        <label style={{ color: "#94a3b8", fontSize: "0.78rem", fontFamily: "'Space Grotesk', sans-serif", display: "block", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                          Font
+                        </label>
+                        <select
+                          value={overlayFontFamily}
+                          onChange={(e) => setOverlayFontFamily(e.target.value)}
+                          style={{
+                            width: "100%",
+                            background: "rgba(255,255,255,0.05)",
+                            border: "1px solid rgba(255,255,255,0.1)",
+                            borderRadius: "10px",
+                            padding: "10px 12px",
+                            color: "#ffffff",
+                            fontSize: "0.9rem",
+                            fontFamily: "'Space Grotesk', sans-serif",
+                            outline: "none",
+                            cursor: "pointer",
+                          }}
+                        >
+                          <option value="Arial" style={{ background: "#1a1a2e" }}>Arial</option>
+                          <option value="Georgia" style={{ background: "#1a1a2e" }}>Georgia</option>
+                          <option value="Impact" style={{ background: "#1a1a2e" }}>Impact</option>
+                          <option value="Times New Roman" style={{ background: "#1a1a2e" }}>Times New Roman</option>
+                          <option value="Courier New" style={{ background: "#1a1a2e" }}>Courier New</option>
+                          <option value="Verdana" style={{ background: "#1a1a2e" }}>Verdana</option>
+                          <option value="Trebuchet MS" style={{ background: "#1a1a2e" }}>Trebuchet</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label style={{ color: "#94a3b8", fontSize: "0.78rem", fontFamily: "'Space Grotesk', sans-serif", display: "block", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                          Size: {overlayFontSize}
+                        </label>
+                        <input
+                          type="range"
+                          min={20}
+                          max={100}
+                          value={overlayFontSize}
+                          onChange={(e) => setOverlayFontSize(Number(e.target.value))}
+                          style={{ width: "100%", accentColor: "#a855f7", cursor: "pointer" }}
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px" }}>
+                      <div>
+                        <label style={{ color: "#94a3b8", fontSize: "0.78rem", fontFamily: "'Space Grotesk', sans-serif", display: "block", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                          Text Color
+                        </label>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <input
+                            type="color"
+                            value={overlayTextColor}
+                            onChange={(e) => setOverlayTextColor(e.target.value)}
+                            style={{ width: "40px", height: "40px", borderRadius: "8px", border: "none", cursor: "pointer", background: "none" }}
+                          />
+                          <span style={{ color: "#64748b", fontSize: "0.8rem", fontFamily: "'Space Grotesk', sans-serif" }}>{overlayTextColor}</span>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label style={{ color: "#94a3b8", fontSize: "0.78rem", fontFamily: "'Space Grotesk', sans-serif", display: "block", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                          Stroke Color
+                        </label>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <input
+                            type="color"
+                            value={overlayStrokeColor}
+                            onChange={(e) => setOverlayStrokeColor(e.target.value)}
+                            style={{ width: "40px", height: "40px", borderRadius: "8px", border: "none", cursor: "pointer", background: "none" }}
+                          />
+                          <span style={{ color: "#64748b", fontSize: "0.8rem", fontFamily: "'Space Grotesk', sans-serif" }}>{overlayStrokeColor}</span>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label style={{ color: "#94a3b8", fontSize: "0.78rem", fontFamily: "'Space Grotesk', sans-serif", display: "block", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                          BG Opacity: {Math.round(overlayBgOpacity * 100)}%
+                        </label>
+                        <input
+                          type="range"
+                          min={0}
+                          max={1}
+                          step={0.1}
+                          value={overlayBgOpacity}
+                          onChange={(e) => setOverlayBgOpacity(Number(e.target.value))}
+                          style={{ width: "100%", accentColor: "#a855f7", cursor: "pointer" }}
+                        />
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={handleApplyTextOverlay}
+                      disabled={!overlayText.trim() || isApplyingText}
+                      style={{
+                        width: "100%",
+                        padding: "14px",
+                        borderRadius: "12px",
+                        border: "none",
+                        background: overlayText.trim()
+                          ? "linear-gradient(135deg, #a855f7, #ec4899)"
+                          : "rgba(255,255,255,0.05)",
+                        color: overlayText.trim() ? "white" : "#64748b",
+                        fontSize: "0.95rem",
+                        fontWeight: 600,
+                        fontFamily: "'Space Grotesk', sans-serif",
+                        cursor: overlayText.trim() ? "pointer" : "not-allowed",
+                        transition: "all 0.3s ease",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "8px",
+                      }}
+                    >
+                      {isApplyingText ? "⏳ Applying Text..." : "✍️ Apply Text to Image"}
+                    </button>
+
+                    {processedImage && (
+                      <button
+                        onClick={handleRemoveText}
+                        style={{
+                          width: "100%",
+                          padding: "10px",
+                          borderRadius: "12px",
+                          border: "1px solid rgba(239,68,68,0.3)",
+                          background: "rgba(239,68,68,0.08)",
+                          color: "#ef4444",
+                          fontSize: "0.85rem",
+                          fontWeight: 500,
+                          fontFamily: "'Space Grotesk', sans-serif",
+                          cursor: "pointer",
+                          transition: "all 0.2s ease",
+                        }}
+                      >
+                        🗑️ Remove Text Overlay
+                      </button>
+                    )}
+
+                    <p style={{
+                      color: "#475569",
+                      fontSize: "0.78rem",
+                      fontFamily: "'Space Grotesk', sans-serif",
+                      textAlign: "center",
+                      margin: 0,
+                    }}>
+                      ✦ Generate an image first, then apply text overlay on top of it
+                    </p>
                   </div>
-                </div>
+                )}
               </div>
 
               {/* Feature 3: Aspect Ratio Selector */}
@@ -1006,7 +1279,7 @@ function HomeContent() {
                     blurDataURL={imagePlaceholder.blurDataURL}
                     width={1024}
                     height={1024}
-                    src={`data:image/png;base64,${activeGeneration.image.b64_json}`}
+                    src={displayImage || `data:image/png;base64,${activeGeneration.image.b64_json}`}
                     alt={activeGeneration.prompt}
                     loading="lazy"
                     style={{
@@ -1066,7 +1339,10 @@ function HomeContent() {
                       <button
                         key={item.id}
                         type="button"
-                        onClick={() => setActiveGenerationId(item.id)}
+                        onClick={() => {
+                          setProcessedImage(null);
+                          setActiveGenerationId(item.id);
+                        }}
                         className={`overflow-hidden rounded border transition ${
                           activeGeneration?.id === item.id
                             ? "border-[#a855f7]"
