@@ -25,7 +25,7 @@
 
 ## Cloning & running
 
-1. Clone the repo: `git clone https://github.com/Nutlope/blinkshot`
+1. Clone the repo: `https://github.com/muhammad364/PixelMind-Ai`
 2. Set `GROQ_API_KEY` in `.env.local` to enable the Prompt Enhancer
 3. No API key is required for image generation with Pollinations.ai
 4. Run `npm install` and `npm run dev` to install dependencies and run locally
