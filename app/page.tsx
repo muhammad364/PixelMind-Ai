@@ -527,6 +527,7 @@ function HomeContent() {
               {/* Add Text to Image Section */}
               <div style={{ marginBottom: "20px" }}>
                 <button
+                  type="button"
                   onClick={() => setTextOverlayOpen(!textOverlayOpen)}
                   style={{
                     width: "100%",
