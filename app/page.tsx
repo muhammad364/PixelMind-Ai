@@ -314,7 +314,14 @@ function HomeContent() {
   }
 
   const handleApplyTextOverlay = async () => {
-    if (!activeGeneration || !overlayText.trim()) return;
+    if (!activeGeneration) {
+      toast.error("Please generate an image first before applying text");
+      return;
+    }
+    if (!overlayText.trim()) {
+      toast.error("Please enter text to apply");
+      return;
+    }
     setIsApplyingText(true);
     try {
       const result = await applyTextOverlay(activeGeneration.image.b64_json, {
@@ -334,8 +341,10 @@ function HomeContent() {
         textStyle: overlayTextStyle,
       });
       setProcessedImage(result);
+      toast.success("Text applied to image!");
     } catch (error) {
       console.error("Text overlay failed:", error);
+      toast.error("Failed to apply text overlay");
     }
     setIsApplyingText(false);
   };
@@ -382,12 +391,13 @@ function HomeContent() {
             maxWidth: "1200px",
             width: "100%",
             margin: "0 auto",
-            padding: "14px 32px",
+            padding: "14px 16px",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
             boxSizing: "border-box",
-          }}>
+          }}
+          className="md:px-8 lg:px-8">
             {/* Logo and name on left */}
             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
               <img src="/icon.png" alt="logo" width={36} height={36}
@@ -420,9 +430,10 @@ function HomeContent() {
           width: "100%",
           maxWidth: "1200px",
           margin: "0 auto",
-          padding: "0 32px 80px 32px",
+          padding: "0 16px 80px 16px",
           boxSizing: "border-box",
-        }}>
+        }}
+        className="md:px-8 lg:px-8">
           <form
             className="glass-card"
             style={{
@@ -446,6 +457,7 @@ function HomeContent() {
               {/* Textarea Section */}
               <div style={{ position: "relative", width: "100%", marginBottom: "8px" }}>
                 <textarea
+                  id="main-prompt-textarea"
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
                   placeholder="Describe the image you want to create..."
@@ -464,6 +476,9 @@ function HomeContent() {
                     outline: "none",
                     boxSizing: "border-box",
                     display: "block",
+                    maxWidth: "100%",
+                    overflowWrap: "break-word",
+                    wordWrap: "break-word",
                   }}
                 />
                 {/* Enhance Prompt button - locked inside textarea */}
@@ -757,20 +772,20 @@ function HomeContent() {
 
                     <button
                       onClick={handleApplyTextOverlay}
-                      disabled={!overlayText.trim() || isApplyingText}
+                      disabled={!overlayText.trim() || isApplyingText || !activeGeneration}
                       style={{
                         width: "100%",
                         padding: "14px",
                         borderRadius: "12px",
                         border: "none",
-                        background: overlayText.trim()
+                        background: (overlayText.trim() && activeGeneration)
                           ? "linear-gradient(135deg, #a855f7, #ec4899)"
                           : "rgba(255,255,255,0.05)",
-                        color: overlayText.trim() ? "white" : "#64748b",
+                        color: (overlayText.trim() && activeGeneration) ? "white" : "#64748b",
                         fontSize: "0.95rem",
                         fontWeight: 600,
                         fontFamily: "'Space Grotesk', sans-serif",
-                        cursor: overlayText.trim() ? "pointer" : "not-allowed",
+                        cursor: (overlayText.trim() && activeGeneration) ? "pointer" : "not-allowed",
                         transition: "all 0.3s ease",
                         display: "flex",
                         alignItems: "center",
@@ -809,7 +824,7 @@ function HomeContent() {
                       textAlign: "center",
                       margin: 0,
                     }}>
-                      ✦ Generate an image first, then apply text overlay on top of it
+                      ✦ Step 1: Click "Generate" button to create an image. Step 2: Enter text and click "Apply Text to Image" to add it.
                     </p>
                   </div>
                 )}
@@ -820,7 +835,13 @@ function HomeContent() {
                 <p style={sectionLabelStyle}>
                   Aspect Ratio
                 </p>
-                <div style={rowContainerStyle}>
+                <div style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(90px, 1fr))",
+                  gap: "10px",
+                  width: "100%",
+                  boxSizing: "border-box",
+                }}>
                   {Object.entries(dimensionsMap).map(([ratio, data]) => {
                     const isSelected = selectedRatio === ratio;
                     return (
@@ -829,9 +850,9 @@ function HomeContent() {
                         type="button"
                         onClick={() => setSelectedRatio(ratio)}
                         style={{
-                          width: "100px",
-                          height: "100px",
-                          flexShrink: 0,
+                          width: "100%",
+                          minWidth: "80px",
+                          aspectRatio: "1",
                           borderRadius: "14px",
                           padding: "10px 8px",
                           display: "flex",
@@ -961,43 +982,18 @@ function HomeContent() {
                   </div>
                 </div>
 
-                <div style={{ position: "relative", width: "100%" }}>
-                  {/* Left fade */}
-                  <div style={{
-                    position: "absolute",
-                    left: 0,
-                    top: 0,
-                    bottom: 8,
-                    width: "40px",
-                    background: "linear-gradient(to right, #0d0d1a, transparent)",
-                    zIndex: 2,
-                    pointerEvents: "none",
-                    borderRadius: "14px 0 0 14px",
-                  }} />
-                  {/* Right fade */}
-                  <div style={{
-                    position: "absolute",
-                    right: 0,
-                    top: 0,
-                    bottom: 8,
-                    width: "60px",
-                    background: "linear-gradient(to left, #0d0d1a, transparent)",
-                    zIndex: 2,
-                    pointerEvents: "none",
-                    borderRadius: "0 14px 14px 0",
-                  }} />
-                  {/* Scrollable Cards Row */}
+                <div style={{ width: "100%" }}>
+                  {/* Responsive Grid or Scrollable Cards Row */}
                   <div
                     ref={styleScrollRef}
                     style={{
-                      display: "flex",
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fit, minmax(90px, 1fr))",
                       gap: "10px",
-                      overflowX: "auto",
-                      paddingBottom: "8px",
-                      scrollbarWidth: "none",
-                      msOverflowStyle: "none",
-                      scrollBehavior: "smooth",
+                      width: "100%",
+                      boxSizing: "border-box",
                     }}
+                    className="md:flex md:overflow-x-auto md:pb-2 md:scrollbar-hide"
                   >
                     {stylePresets.map((style) => {
                       const isSelected = selectedStyleValue === style.id;
@@ -1007,9 +1003,9 @@ function HomeContent() {
                           type="button"
                           onClick={() => setSelectedStyleValue(style.id)}
                           style={{
-                            width: "100px",
-                            height: "100px",
-                            flexShrink: 0,
+                            width: "100%",
+                            minWidth: "80px",
+                            aspectRatio: "1",
                             borderRadius: "14px",
                             padding: "10px 8px",
                             display: "flex",
@@ -1025,6 +1021,7 @@ function HomeContent() {
                               ? "rgba(168,85,247,0.12)"
                               : "rgba(255,255,255,0.04)",
                             transition: "all 0.2s ease",
+                            flexShrink: 0,
                           }}
                         >
                           {isSelected && (
@@ -1058,9 +1055,11 @@ function HomeContent() {
                 marginTop: "20px",
                 paddingTop: "16px",
                 borderTop: "1px solid rgba(255,255,255,0.1)",
-              }}>
+              }}
+              className="flex-col sm:flex-row">
                 {/* Left side - styles and consistency mode */}
-                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", width: "100%", boxSizing: "border-box" }}
+                className="sm:w-auto">
                   <label
                     title="Use earlier images as references"
                     style={{
@@ -1115,7 +1114,8 @@ function HomeContent() {
                 </div>
 
                 {/* Right side - Random and Generate */}
-                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                <div style={{ display: "flex", gap: "8px", alignItems: "center", width: "100%", boxSizing: "border-box" }}
+                className="sm:w-auto">
                   {/* Feature 2: Random Prompt Button */}
                   <button
                     type="button"
@@ -1130,6 +1130,8 @@ function HomeContent() {
                       height: "42px",
                       display: "flex",
                       alignItems: "center",
+                      minWidth: "42px",
+                      justifyContent: "center",
                     }}
                     title="Generate a random creative prompt"
                   >
@@ -1144,17 +1146,20 @@ function HomeContent() {
                       color: "white",
                       border: "none",
                       borderRadius: "10px",
-                      padding: "10px 28px",
-                      fontSize: "0.95rem",
+                      padding: "10px 16px",
+                      fontSize: "0.85rem",
                       fontWeight: 600,
                       fontFamily: "'Space Grotesk', sans-serif",
                       cursor: "pointer",
                       display: "flex",
                       alignItems: "center",
+                      justifyContent: "center",
                       gap: "8px",
                       height: "42px",
                       transition: "all 0.2s ease",
                       animation: isGenerating ? "none" : "pulse-glow 3s ease-in-out infinite",
+                      minWidth: "fit-content",
+                      whiteSpace: "nowrap",
                     }}
                     onMouseEnter={e => {
                       e.currentTarget.style.transform = "scale(1.04) translateY(-2px)";
